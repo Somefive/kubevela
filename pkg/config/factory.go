@@ -24,6 +24,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oam-dev/kubevela/pkg/cue/cuex"
+
+	cuelang "cuelang.org/go/cue"
+	pkgcuex "github.com/kubevela/pkg/cue/cuex"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -180,6 +185,12 @@ type Distribution struct {
 type CreateDistributionSpec struct {
 	Configs []*NamespacedName
 	Targets []*ClusterTarget
+}
+
+// Validation the response of the validation
+type Validation struct {
+	Result  bool   `json:"result"`
+	Message string `json:"message"`
 }
 
 // Factory handle the config
@@ -446,16 +457,34 @@ func (k *kubeConfigFactory) ParseConfig(ctx context.Context,
 			Name:      meta.Name,
 			Namespace: meta.Namespace,
 		}
+
+		contextOption := pkgcuex.WithExtraData("context", contextValue)
+		parameterOption := pkgcuex.WithExtraData("parameter", meta.Properties)
+		// Compile the config template
+		val, err := cuex.KubeVelaDefaultCompiler.CompileStringWithOptions(context.TODO(), string(template.Template), contextOption, parameterOption)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compile config template: %w", err)
+		}
+
+		// Render the validation response
+		valid, err := val.LookupPath(cuelang.ParsePath(SaveTemplateKey + ".validation")).MarshalJSON()
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse config template validation: %w", err)
+		}
+		validation := Validation{}
+		if err = json.Unmarshal(valid, &validation); err != nil {
+			return nil, fmt.Errorf("failed to parse template validation into validation: %w", err)
+		}
+
 		// Render the output secret
-		output, err := template.Template.RunAndOutput(contextValue, meta.Properties)
-		if err != nil && !cue.IsFieldNotExist(err) {
-			return nil, err
+		output, err := val.LookupPath(cuelang.ParsePath(SaveTemplateKey + "output")).MarshalJSON()
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse config template output: %w", err)
 		}
-		if output != nil {
-			if err := output.UnmarshalTo(&secret); err != nil {
-				return nil, fmt.Errorf("the output format must be secret")
-			}
+		if err = json.Unmarshal(output, &secret); err != nil {
+			return nil, fmt.Errorf("failed to parse template output into secret: %w", err)
 		}
+
 		if secret.Type == "" {
 			secret.Type = v1.SecretType(fmt.Sprintf("%s/%s", "", template.Name))
 		}
