@@ -24,10 +24,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oam-dev/kubevela/pkg/cue/cuex"
+	velacuex "github.com/oam-dev/kubevela/pkg/cue/cuex"
 
 	cuelang "cuelang.org/go/cue"
-	pkgcuex "github.com/kubevela/pkg/cue/cuex"
+	"github.com/kubevela/pkg/cue/cuex"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	v1 "k8s.io/api/core/v1"
@@ -458,31 +458,25 @@ func (k *kubeConfigFactory) ParseConfig(ctx context.Context,
 			Namespace: meta.Namespace,
 		}
 
-		contextOption := pkgcuex.WithExtraData("context", contextValue)
-		parameterOption := pkgcuex.WithExtraData("parameter", meta.Properties)
+		contextOption := cuex.WithExtraData("context", contextValue)
+		parameterOption := cuex.WithExtraData("parameter", meta.Properties)
 		// Compile the config template
-		val, err := cuex.KubeVelaDefaultCompiler.CompileStringWithOptions(context.TODO(), string(template.Template), contextOption, parameterOption)
+		val, err := velacuex.KubeVelaDefaultCompiler.Get().CompileStringWithOptions(ctx, string(template.Template), contextOption, parameterOption)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compile config template: %w", err)
 		}
 
 		// Render the validation response
-		valid, err := val.LookupPath(cuelang.ParsePath(SaveTemplateKey + ".validation")).MarshalJSON()
+		validation := Validation{}
+		err = val.LookupPath(cuelang.ParsePath(SaveTemplateKey + ".validation")).Decode(&validation)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse config template validation: %w", err)
 		}
-		validation := Validation{}
-		if err = json.Unmarshal(valid, &validation); err != nil {
-			return nil, fmt.Errorf("failed to parse template validation into validation: %w", err)
-		}
 
 		// Render the output secret
-		output, err := val.LookupPath(cuelang.ParsePath(SaveTemplateKey + "output")).MarshalJSON()
+		err = val.LookupPath(cuelang.ParsePath(SaveTemplateKey + "output")).Decode(&secret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse config template output: %w", err)
-		}
-		if err = json.Unmarshal(output, &secret); err != nil {
-			return nil, fmt.Errorf("failed to parse template output into secret: %w", err)
 		}
 
 		if secret.Type == "" {

@@ -37,5 +37,5 @@ func (r *registryHelper) Auth(ctx context.Context, imageRegistry *ImageRegistry)
 		return false, err
 	}
 
-	return secretAuth.Auth()
+	return secretAuth.Auth(ctx)
 }

@@ -32,7 +32,7 @@ import (
 type SecretAuthenticator interface {
 	Options() []Option
 
-	Auth() (bool, error)
+	Auth(ctx context.Context) (bool, error)
 
 	Authorization() (*authn.AuthConfig, error)
 }
@@ -68,6 +68,7 @@ func NewSecretAuthenticator(imageRegistry *ImageRegistry) (SecretAuthenticator, 
 		Auth:     base64.StdEncoding.EncodeToString([]byte(auth)),
 	}
 
+	sa.auths = map[string]DockerConfigEntry{}
 	if imageRegistry.UseHTTP {
 		sa.auths[fmt.Sprintf("http://%s", imageRegistry.Registry)] = entry
 	} else {
@@ -87,14 +88,14 @@ func (s *secretAuthenticator) Authorization() (*authn.AuthConfig, error) {
 	return &authn.AuthConfig{}, nil
 }
 
-func (s *secretAuthenticator) Auth() (bool, error) {
+func (s *secretAuthenticator) Auth(ctx context.Context) (bool, error) {
 	for k := range s.auths {
-		return s.AuthRegistry(k)
+		return s.AuthRegistry(ctx, k)
 	}
 	return false, fmt.Errorf("no registry found in image-registry")
 }
 
-func (s *secretAuthenticator) AuthRegistry(reg string) (bool, error) {
+func (s *secretAuthenticator) AuthRegistry(ctx context.Context, reg string) (bool, error) {
 	url, err := url.Parse(reg) // in case reg is unformatted like http://docker.index.io
 	if err != nil {
 		return false, err
@@ -110,7 +111,6 @@ func (s *secretAuthenticator) AuthRegistry(reg string) (bool, error) {
 		return false, err
 	}
 
-	ctx := context.TODO()
 	_, err = transport.NewWithContext(ctx, registry, s, http.DefaultTransport, []string{})
 	if err != nil {
 		return false, err

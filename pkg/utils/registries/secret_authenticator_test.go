@@ -1,45 +1,44 @@
-package v2
+/*
+Copyright 2023 The KubeVela Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package registries
 
 import (
-	"fmt"
+	"context"
 	"testing"
-
-	"encoding/base64"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-containerregistry/pkg/authn"
-	v1 "k8s.io/api/core/v1"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func buildSecret(registry, username, password string, insecure bool) *v1.Secret {
-	auth := fmt.Sprintf("%s:%s", username, password)
-	authString := fmt.Sprintf("{\"auths\":{\"%s\":{\"username\":\"%s\",\"password\":\"%s\",\"email\":\"\",\"auth\":\"%s\"}}}", registry, username, password, base64.StdEncoding.EncodeToString([]byte(auth)))
-
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "docker",
-			Namespace: v1.NamespaceDefault,
-		},
-		Data: map[string][]byte{
-			v1.DockerConfigJsonKey: []byte(authString),
-		},
-		Type: v1.SecretTypeDockerConfigJson,
+func buildImageRegistry(registry, username, password string, insecure bool, useHTTP bool) *ImageRegistry {
+	imageRegistry := &ImageRegistry{
+		Registry: registry,
+		Auth:     Auth{Username: username, Password: password},
+		Insecure: insecure,
+		UseHTTP:  useHTTP,
 	}
 
-	if insecure {
-		secret.Annotations = make(map[string]string)
-		secret.Annotations[forceInsecure] = "true"
-	}
-
-	return secret
+	return imageRegistry
 }
 
 func TestSecretAuthenticator(t *testing.T) {
-	secret := buildSecret("dockerhub.qingcloud.com", "guest", "guest", false)
+	imageRegistry := buildImageRegistry("dockerhub.qingcloud.com", "guest", "guest", false, false)
 
-	secretAuthenticator, err := NewSecretAuthenticator(secret)
+	secretAuthenticator, err := NewSecretAuthenticator(imageRegistry)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,39 +61,39 @@ func TestSecretAuthenticator(t *testing.T) {
 
 func TestAuthn(t *testing.T) {
 	testCases := []struct {
-		name      string
-		secret    *v1.Secret
-		auth      bool
-		expectErr bool
+		name          string
+		imageRegistry *ImageRegistry
+		auth          bool
+		expectErr     bool
 	}{
 		{
-			name:      "Should authenticate with correct credential",
-			secret:    buildSecret("https://dockerhub.qingcloud.com", "guest", "guest", false),
-			auth:      true,
-			expectErr: false,
+			name:          "Should authenticate with correct credential",
+			imageRegistry: buildImageRegistry("dockerhub.qingcloud.com", "guest", "guest", false, false),
+			auth:          true,
+			expectErr:     false,
 		},
 		{
-			name:      "Shouldn't authenticate with incorrect credentials",
-			secret:    buildSecret("https://index.docker.io", "foo", "bar", false),
-			auth:      false,
-			expectErr: true,
+			name:          "Shouldn't authenticate with incorrect credentials",
+			imageRegistry: buildImageRegistry("index.docker.io", "foo", "bar", false, false),
+			auth:          false,
+			expectErr:     true,
 		},
 		{
-			name:      "Shouldn't authenticate with no credentials",
-			secret:    nil,
-			auth:      false,
-			expectErr: true,
+			name:          "Shouldn't authenticate with no credentials",
+			imageRegistry: nil,
+			auth:          false,
+			expectErr:     true,
 		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			secretAuthenticator, err := NewSecretAuthenticator(testCase.secret)
+			secretAuthenticator, err := NewSecretAuthenticator(testCase.imageRegistry)
 			if err != nil {
 				t.Errorf("error creating secretAuthenticator, %v", err)
 			}
 
-			ok, err := secretAuthenticator.Auth()
+			ok, err := secretAuthenticator.Auth(context.Background())
 			if testCase.auth != ok {
 				t.Errorf("expected auth result: %v, but got %v", testCase.auth, ok)
 			}
