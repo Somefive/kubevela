@@ -18,11 +18,15 @@ package cuex
 
 import (
 	"github.com/kubevela/pkg/cue/cuex"
+	"github.com/kubevela/pkg/util/singleton"
 
 	"github.com/oam-dev/kubevela/pkg/cue/cuex/providers/config"
 )
 
 // KubeVelaDefaultCompiler compiler for cuex to compile
-var KubeVelaDefaultCompiler = cuex.NewCompilerWithInternalPackages(
-	config.Package,
-)
+var KubeVelaDefaultCompiler = singleton.NewSingleton[*cuex.Compiler](func() *cuex.Compiler {
+	compiler := cuex.NewCompilerWithInternalPackages(
+		config.Package,
+	)
+	return compiler
+})
