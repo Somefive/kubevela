@@ -476,7 +476,6 @@ func (k *kubeConfigFactory) ParseConfig(ctx context.Context,
 		}
 
 		// Render the validation response and check validation result
-		// TODO: support validate nacos-config and nacos-server.
 		if template.Name == types.ImageRegistry || template.Name == types.HelmRepository {
 			valid := val.LookupPath(cuelang.ParsePath(TemplateValidation))
 			if !valid.Exists() {
@@ -485,7 +484,7 @@ func (k *kubeConfigFactory) ParseConfig(ctx context.Context,
 			validation := Validation{}
 			err = valid.Decode(&validation)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse config template validation: %w", err)
+				return nil, fmt.Errorf("the validation format must be validation")
 			}
 			if !validation.Result {
 				return nil, fmt.Errorf("failed to validate config due to: %s", validation.Message)
@@ -494,12 +493,10 @@ func (k *kubeConfigFactory) ParseConfig(ctx context.Context,
 
 		// Render the output secret
 		output := val.LookupPath(cuelang.ParsePath(TemplateOutput))
-		if !output.Exists() {
-			return nil, fmt.Errorf("failed to lookup value: var(path=%s) not exist", TemplateOutput)
-		}
-		err = output.Decode(&secret)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse config template output: %w", err)
+		if output.Exists() {
+			if err := output.Decode(&secret); err != nil {
+				return nil, fmt.Errorf("the output format must be secret")
+			}
 		}
 
 		if secret.Type == "" {
