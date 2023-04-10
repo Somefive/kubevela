@@ -137,7 +137,7 @@ var _ = Describe("Test helm helper", func() {
 			URL: "https://www.baidu.com",
 		}
 		ok, err := helper.ValidateRepo(ctx, helmRepo)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).To(HaveOccurred())
 		Expect(ok).Should(BeFalse())
 	})
 })

@@ -74,6 +74,12 @@ const SaveTemplateKey = "template"
 // TemplateConfigMapNamePrefix the prefix of the configmap name.
 const TemplateConfigMapNamePrefix = "config-template-"
 
+// TemplateValidation define the key name for the config-template validation
+const TemplateValidation = SaveTemplateKey + ".validation"
+
+// TemplateOutput define the key name for the config-template output
+const TemplateOutput = SaveTemplateKey + ".output"
+
 // ErrSensitiveConfig means this config can not be read directly.
 var ErrSensitiveConfig = errors.New("the config is sensitive")
 
@@ -466,15 +472,29 @@ func (k *kubeConfigFactory) ParseConfig(ctx context.Context,
 			return nil, fmt.Errorf("failed to compile config template: %w", err)
 		}
 
-		// Render the validation response
-		validation := Validation{}
-		err = val.LookupPath(cuelang.ParsePath(SaveTemplateKey + ".validation")).Decode(&validation)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse config template validation: %w", err)
+		// Render the validation response and check validation result
+		// TODO: support validate nacos-config and nacos-server.
+		if template.Name == types.ImageRegistry || template.Name == types.HelmRepository {
+			valid := val.LookupPath(cuelang.ParsePath(TemplateValidation))
+			if !valid.Exists() {
+				return nil, fmt.Errorf("failed to lookup value: var(path=%s) not exist", TemplateValidation)
+			}
+			validation := Validation{}
+			err = valid.Decode(&validation)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse config template validation: %w", err)
+			}
+			if !validation.Result {
+				return nil, fmt.Errorf("failed to validate config due to: %s", validation.Message)
+			}
 		}
 
 		// Render the output secret
-		err = val.LookupPath(cuelang.ParsePath(SaveTemplateKey + "output")).Decode(&secret)
+		output := val.LookupPath(cuelang.ParsePath(TemplateOutput))
+		if !output.Exists() {
+			return nil, fmt.Errorf("failed to lookup value: var(path=%s) not exist", TemplateOutput)
+		}
+		err = output.Decode(&secret)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse config template output: %w", err)
 		}
