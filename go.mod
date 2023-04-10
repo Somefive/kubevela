@@ -112,9 +112,9 @@ require (
 require (
 	github.com/dave/jennifer v1.6.0
 	github.com/ettle/strcase v0.1.1
+	github.com/google/go-containerregistry v0.13.0
 	github.com/oam-dev/cluster-gateway v1.9.0-alpha.1
 	golang.org/x/tools v0.7.0
-	github.com/google/go-containerregistry v0.13.0
 )
 
 require (
