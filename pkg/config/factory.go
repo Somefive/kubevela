@@ -464,7 +464,10 @@ func (k *kubeConfigFactory) ParseConfig(ctx context.Context,
 			Namespace: meta.Namespace,
 		}
 
-		contextOption := cuex.WithExtraData("context", contextValue)
+		contextOption := cuex.WithExtraData("context", map[string]interface{}{
+			"name":      contextValue.Name,
+			"namespace": contextValue.Namespace,
+		})
 		parameterOption := cuex.WithExtraData("parameter", meta.Properties)
 		// Compile the config template
 		val, err := velacuex.KubeVelaDefaultCompiler.Get().CompileStringWithOptions(ctx, string(template.Template), contextOption, parameterOption)
