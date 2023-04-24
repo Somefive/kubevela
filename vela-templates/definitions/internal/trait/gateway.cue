@@ -60,7 +60,7 @@ template: {
 	let ingressOutputName = "ingress" + nameSuffix
 	let ingressMetaName = context.name + nameSuffix
 	legacyAPI: context.clusterVersion.minor < 19
-	outputs: "\(ingressOutputName)": {
+	outputs: (ingressOutputName): {
 		if legacyAPI {
 			apiVersion: "networking.k8s.io/v1beta1"
 		}
