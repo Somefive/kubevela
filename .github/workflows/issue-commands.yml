@@ -80,3 +80,23 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_workspace: ${{ github.workspace }}
+
+  retest:
+    runs-on: ubuntu-22.04
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/retest')
+    permissions:
+      action: write
+    steps:
+      - name: Retest the current pull request
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            ["go.yml", "unit-test.yml", "e2e-test.yml", "e2e-rollout-test.yml"].forEach((workflow_id) => {
+              github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: workflow_id,
+                ref: context.ref,
+              })
+            }); 
