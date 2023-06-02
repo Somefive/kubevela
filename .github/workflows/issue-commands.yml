@@ -1,12 +1,15 @@
-name: Run commands for issues and pull requetss
+name: Run commands for issues and pull requests
 on:
   issues:
     types: [labeled, opened]
   issue_comment:
     types: [created]
 
-permissions:
-  contents: read
+permissions: write-all
+#  actions: write
+#  contents: write
+#  pull-requests: write
+#  issues: write
 
 jobs:
   bot:
@@ -29,16 +32,12 @@ jobs:
       - name: Run Commands
         uses: ./actions/commands
         with:
-          token: ${{secrets.VELA_BOT_TOKEN}}
+          token: ${{ secrets.GITHUB_TOKEN }}
           configPath: issue-commands
 
   backport:
     runs-on: ubuntu-22.04
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/backport')
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
     steps:
       - name: Extract Command
         id: command
@@ -84,11 +83,6 @@ jobs:
   retest:
     runs-on: ubuntu-22.04
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/retest')
-    permissions:
-      actions: write
-      contents: write
-      pull-requests: write
-      issues: write
     steps:
       - name: Retest the current pull request
         uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410
